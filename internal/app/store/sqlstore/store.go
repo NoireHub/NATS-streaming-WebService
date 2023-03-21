@@ -11,6 +11,20 @@ type Store struct {
 	orderRepository *OrderRepository
 }
 
+func New(db *sql.DB) *Store {
+	return &Store{
+		db: db,
+	}
+}
+
 func (s *Store) Order() store.OrderRepository {
+	if s.orderRepository != nil {
+		return s.orderRepository
+	}
+
+	s.orderRepository = &OrderRepository{
+		store: s,
+	}
+
 	return s.orderRepository
 }
