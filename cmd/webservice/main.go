@@ -16,6 +16,10 @@ func init() {
 	flag.StringVar(&configPath,"","configs/webservice.toml","path to config file")
 }
 
+func handleCrash() {
+	
+}
+
 func main() {
 	flag.Parse()
 
@@ -25,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	} 
 
-	if err := webservice.Start(); err != nil {
+	if err := webservice.Start(config); err != nil {
 		log.Fatal(err)
 	}
 }
