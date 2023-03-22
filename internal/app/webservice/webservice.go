@@ -1,10 +1,10 @@
 package webservice
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/NoireHub/NATS-streaming-WebService/internal/app/store/sqlstore"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
@@ -29,8 +29,8 @@ func Start(config *Config) error {
 	return http.ListenAndServe(config.BindAddr, server)
 }
 
-func newDB(dbURL string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dbURL)
+func newDB(dbURL string) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres",dbURL)
 	if err != nil {
 		return nil, err
 	}

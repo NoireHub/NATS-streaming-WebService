@@ -11,5 +11,6 @@ CREATE TABLE orders (
    delivery_service varchar not null,
    shardkey varchar not null,
    sm_id integer not null,
-   date_created timestamptz not null
+   date_created timestamptz not null,
+   oof_shard varchar not null
 );
