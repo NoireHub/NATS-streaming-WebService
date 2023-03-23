@@ -7,7 +7,7 @@ CREATE TABLE orders (
    items jsonb not null,
    locale varchar(5) not null,
    internal_signature varchar,
-   customer_id varchar unique not null,
+   customer_id varchar not null,
    delivery_service varchar not null,
    shardkey varchar not null,
    sm_id integer not null,
