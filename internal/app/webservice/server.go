@@ -2,8 +2,10 @@ package webservice
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"os"
+	"fmt"
+	"text/template"
 
 	"github.com/NoireHub/NATS-streaming-WebService/internal/app/model"
 	"github.com/NoireHub/NATS-streaming-WebService/internal/app/store"
@@ -26,8 +28,15 @@ func NewServer(store store.Store, stanClusterID string, stanSubj string) (*serve
 		logger: logrus.New(),
 		store:  store,
 	}
+	natsURL:= ""
 
-	sc, err := stan.Connect(stanClusterID, "subscriber", stan.NatsURL("nats://localhost:4222"))
+	if os.Getenv("HOST") != "" {
+		natsURL = fmt.Sprintf("nats://%s:4222", os.Getenv("HOST"))
+	}else{
+		natsURL = "nats://localhost:4222"
+	}
+
+	sc, err := stan.Connect(stanClusterID, "subscriber", stan.NatsURL(natsURL))
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +48,7 @@ func NewServer(store store.Store, stanClusterID string, stanSubj string) (*serve
 	}
 	s.stanSub = sub
 
-	if err:= s.store.Order().GetCache(); err != nil {
+	if err := s.store.Order().GetCache(); err != nil {
 		return nil, err
 	}
 
@@ -57,20 +66,68 @@ func (s *server) configureRouter() {
 		func(w http.ResponseWriter, r *http.Request) {
 			s.preflightHandler(w, r)
 		})
+	s.router.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir("./static"))))
+
+	s.router.HandleFunc("/", s.handleIndex()).Methods("GET")
+	s.router.HandleFunc("/order/{order_uid}", s.handleGetOrder()).Methods("GET")
 
 }
 
 func (s *server) handleNatsMessage(m *stan.Msg) {
-	d := &model.Order{}
-	fmt.Println(m)
-	err := json.Unmarshal(m.Data, d)
-	fmt.Println(d)
-	fmt.Println(err)
-	if err := s.store.Order().AddOrder(d); err != nil {
-		s.logger.Info(err)
+	order := model.Order{}
+	if err := json.Unmarshal(m.Data, &order); err != nil {
+		s.logger.Error(err)
+		return
+	}
+	if err := s.store.Order().AddOrder(&order); err != nil {
+		s.logger.Error(err)
+		return
 	}
 
-	s.logger.Info(s.store.Order().GetOrderById("b563feb7b2b84b6test"))
+	s.logger.Info("Added order: " + order.OrderUid)
+}
+
+func (s *server) handleIndex() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "text/html; charset=utf-8")
+
+		t, err := template.ParseFiles("./static/index.html")
+		if err != nil {
+			s.error(w, r, http.StatusNotFound, err)
+		}
+
+		if err := t.Execute(w, nil); err != nil {
+			s.error(w, r, http.StatusNotFound, err)
+		}
+
+		s.respond(w, r, http.StatusOK, nil)
+	}
+}
+
+func (s *server) handleGetOrder() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("content-type", "application/json")
+
+		orderUID := mux.Vars(r)["order_uid"]
+
+		order, err := s.store.Order().GetOrderById(orderUID)
+		if err != nil {
+			s.error(w, r, http.StatusNoContent, err)
+		}
+
+		s.respond(w, r, http.StatusOK, order)
+	}
+}
+
+func (s *server) error(w http.ResponseWriter, r *http.Request, code int, err error) {
+	s.respond(w, r, code, map[string]string{"error:": err.Error()})
+}
+
+func (s *server) respond(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
+	w.WriteHeader(code)
+	if data != nil {
+		json.NewEncoder(w).Encode(data)
+	}
 }
 
 func (s *server) preflightHandler(w http.ResponseWriter, r *http.Request) {

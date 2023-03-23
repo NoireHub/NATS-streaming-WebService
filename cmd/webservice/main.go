@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"os/signal"
+	"os"
+	"syscall"
 
 	"github.com/BurntSushi/toml"
 	"github.com/NoireHub/NATS-streaming-WebService/internal/app/webservice"
@@ -17,11 +20,18 @@ func init() {
 }
 
 func handleCrash() {
-	
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Fatal("interrupt")
+		os.Exit(0)
+	}()
 }
 
 func main() {
 	flag.Parse()
+	handleCrash()
 
 	config:= webservice.NewConfig()
 	_, err := toml.DecodeFile(configPath, config)
