@@ -1,0 +1,35 @@
+version: '3.8' 
+services:   
+  web:
+    build: ./
+    command: ./webservice
+    ports:
+      - 5555:5555
+    depends_on:
+      - db
+      - nats-streaming
+    environment:
+      - HOST=host.docker.internal
+
+  db:
+    container_name: pg
+    image: postgres:latest
+    restart: always
+    environment:
+      - POSTGRES_DB=Nats_Streaming
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+    volumes:
+      - ./migrations/000001_create_orders.up.sql:/docker-entrypoint-initdb.d/000001_create_orders.up.sql
+    ports:
+      - "5000:5000"
+
+  nats-streaming:
+    container_name: nats-streaming
+    image: nats-streaming
+    ports:
+    - 4222:4222
+    - 8222:8222
+
+
+  
